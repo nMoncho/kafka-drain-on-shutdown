@@ -1,0 +1,58 @@
+version: '3'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    logging:
+      driver: none
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: 22181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+      ZOOKEEPER_SERVERS: zookeeper:22888:23888
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:22181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  producer:
+    image: kafka-drain:0.1.0-SNAPSHOT
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    stop_grace_period: 5m
+    networks:
+      - default
+    entrypoint:
+      - bash
+      - -c
+      - |
+        while ! bash -c "echo > /dev/tcp/kafka/9092" 2> /dev/null; do sleep 1; done
+        sleep 10s
+        /opt/docker/bin/producer
+    depends_on:
+      - kafka
+
+  consumer:
+    image: kafka-drain:0.1.0-SNAPSHOT
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    stop_grace_period: 5m
+    networks:
+      - default
+    entrypoint:
+      - bash
+      - -c
+      - |
+        while ! bash -c "echo > /dev/tcp/kafka/9092" 2> /dev/null; do sleep 1; done
+        sleep 10s
+        /opt/docker/bin/consumer-commit-flow
+    depends_on:
+      - kafka
